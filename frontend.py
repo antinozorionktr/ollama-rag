@@ -30,11 +30,13 @@ st.markdown("""
         margin: 0.5rem 0;
     }
     .user-message {
-        background-color: #e3f2fd;
+        background-color: #1e3a5f;
+        color: #ffffff;
         border-left: 4px solid #1f77b4;
     }
     .bot-message {
-        background-color: #f5f5f5;
+        background-color: #2e2e2e;
+        color: #ffffff;
         border-left: 4px solid #4caf50;
     }
     .source-box {

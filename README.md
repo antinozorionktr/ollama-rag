@@ -49,17 +49,31 @@ curl -fsSL https://ollama.ai/install.sh | sh
 Download and install from the official website.
 
 ### 3. Start Ollama and Pull a Model
+
+**Choose a model based on your system memory:**
+
 ```bash
 # Start Ollama service
 ollama serve
 
-# Pull a model (in another terminal)
+# For systems with 8GB+ RAM:
 ollama pull llama2
-# or for a smaller model:
+
+# For systems with 4-8GB RAM (recommended):
+ollama pull gemma3:1b
+
+# For systems with limited RAM:
 ollama pull tinyllama
-# or for a more capable model:
-ollama pull mistral
+
+# Check available models
+ollama list
 ```
+
+**Model Memory Requirements:**
+- `tinyllama`: ~600MB RAM - Fast, basic responses
+- `gemma3:1b`: ~800MB RAM - Good balance of quality and speed  
+- `llama2`: ~8GB RAM - High quality responses
+- `llama3.1`: ~9GB RAM - Excellent quality, needs more memory
 
 ## Installation
 
@@ -98,6 +112,15 @@ cp .env.example .env
 ```bash
 mkdir uploads
 mkdir vector_store
+```
+
+### 6. Verify Setup (Recommended)
+```bash
+# Run setup verification
+python setup_check.py
+
+# If there are issues, run the debug script
+python test_ollama.py
 ```
 
 ## Running the Project
@@ -214,14 +237,35 @@ API documentation is available at `http://localhost:8000/docs` when the server i
 
 ### Common Issues
 
-#### 1. Ollama Model Not Available
+#### 1. Ollama Model Not Available / 'name' Error
+This error occurs when there's an issue accessing Ollama models. Here's how to fix it:
+
+**Step 1: Check if Ollama is running**
 ```bash
-# Pull the model
+# Start Ollama service
+ollama serve
+```
+
+**Step 2: Pull a model**
+```bash
+# Pull the default model
 ollama pull llama2
+
+# Or pull a smaller model for testing
+ollama pull tinyllama
 
 # Check available models
 ollama list
 ```
+
+**Step 3: Test the connection**
+```bash
+# Run the debug script
+python test_ollama.py
+```
+
+**Step 4: Verify the model name in config**
+Check your `.env` file and make sure `OLLAMA_MODEL` matches exactly with the installed model name.
 
 #### 2. API Connection Error
 - Ensure FastAPI is running on `http://localhost:8000`

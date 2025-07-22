@@ -59,7 +59,7 @@ class RAGService:
     def query(self, question: str, include_sources: bool = True) -> Dict[str, Any]:
         """Query the RAG system."""
         try:
-            # Search for relevant documents
+            # Search for relevant documents with higher retrieval count
             relevant_docs = self.vector_store.similarity_search(
                 question, 
                 k=Config.TOP_K_RESULTS
@@ -73,8 +73,39 @@ class RAGService:
                     "context_used": ""
                 }
             
+            # For better accuracy, also search with related keywords
+            additional_searches = []
+            question_lower = question.lower()
+            
+            # Add specific searches for common queries
+            if any(word in question_lower for word in ['project', 'projects', 'work']):
+                additional_docs = self.vector_store.similarity_search("projects experience work", k=5)
+                additional_searches.extend(additional_docs)
+            
+            if any(word in question_lower for word in ['skill', 'skills', 'technology', 'technologies']):
+                additional_docs = self.vector_store.similarity_search("skills technologies programming", k=5)
+                additional_searches.extend(additional_docs)
+            
+            if any(word in question_lower for word in ['experience', 'years', 'career']):
+                additional_docs = self.vector_store.similarity_search("experience years career", k=5)
+                additional_searches.extend(additional_docs)
+            
+            # Combine and deduplicate results
+            all_docs = relevant_docs + additional_searches
+            seen_content = set()
+            unique_docs = []
+            
+            for doc, score in all_docs:
+                content_key = doc.page_content[:100]  # Use first 100 chars as key
+                if content_key not in seen_content:
+                    seen_content.add(content_key)
+                    unique_docs.append((doc, score))
+            
+            # Take top results after deduplication
+            final_docs = unique_docs[:min(15, len(unique_docs))]
+            
             # Prepare context from relevant documents
-            context = self._prepare_context(relevant_docs)
+            context = self._prepare_context(final_docs)
             
             # Generate answer using LLM
             answer = self.llm_client.generate_response(question, context)
@@ -82,13 +113,13 @@ class RAGService:
             # Prepare sources information
             sources = []
             if include_sources:
-                sources = self._extract_sources(relevant_docs)
+                sources = self._extract_sources(final_docs[:Config.TOP_K_RESULTS])
             
             return {
                 "success": True,
                 "answer": answer,
                 "sources": sources,
-                "context_used": context[:500] + "..." if len(context) > 500 else context
+                "context_used": context[:1000] + "..." if len(context) > 1000 else context
             }
         except Exception as e:
             return {
@@ -124,8 +155,23 @@ class RAGService:
     def _prepare_context(self, relevant_docs: List[tuple]) -> str:
         """Prepare context from relevant documents."""
         context_parts = []
+        total_length = 0
+        max_context_length = getattr(Config, 'MAX_CONTEXT_LENGTH', 3000)
+        
         for doc, score in relevant_docs:
-            context_parts.append(f"Source: {doc.metadata.get('source', 'Unknown')}\n{doc.page_content}\n")
+            doc_text = f"Source: {doc.metadata.get('source', 'Unknown')}\n{doc.page_content}\n"
+            
+            # Check if adding this would exceed max length
+            if total_length + len(doc_text) > max_context_length:
+                # Try to add a truncated version
+                remaining_space = max_context_length - total_length - 100  # Leave some buffer
+                if remaining_space > 200:  # Only add if meaningful amount of space left
+                    truncated_text = doc_text[:remaining_space] + "...\n"
+                    context_parts.append(truncated_text)
+                break
+            
+            context_parts.append(doc_text)
+            total_length += len(doc_text)
         
         return "\n---\n".join(context_parts)
     
